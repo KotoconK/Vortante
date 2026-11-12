@@ -13,7 +13,7 @@ from urllib.parse import quote
 
 from PySide6.QtCore import Qt, QSettings, QTimer, QUrl
 from PySide6.QtPrintSupport import QPrinter
-from PySide6.QtGui import (QAction, QActionGroup, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QTextCharFormat,
+from PySide6.QtGui import (QAction, QActionGroup, QColor, QDesktopServices, QFont, QIcon, QKeySequence, QPainter, QPen, QPixmap, QTextCharFormat,
                            QTextCursor)
 from PySide6.QtWidgets import (
     QAbstractSpinBox,
@@ -473,6 +473,27 @@ def cargar_analizador():
 
 # ---------- Editor ----------
 
+def icono_alineacion(flag, color: str) -> QIcon:
+    """Dibuja un icono de alineación (líneas de texto) en el color indicado."""
+    pm = QPixmap(24, 24)
+    pm.fill(Qt.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.Antialiasing)
+    p.setPen(QPen(QColor(color), 2, Qt.SolidLine, Qt.RoundCap))
+    anchos = [16, 10, 16, 12]
+    for i, y in enumerate([6, 11, 16, 21]):
+        ancho = 16 if flag == Qt.AlignJustify else anchos[i]
+        if flag == Qt.AlignLeft or flag == Qt.AlignJustify:
+            x0 = 4
+        elif flag == Qt.AlignRight:
+            x0 = 20 - ancho
+        else:  # centro
+            x0 = (24 - ancho) / 2
+        p.drawLine(int(x0), y, int(x0 + ancho), y)
+    p.end()
+    return QIcon(pm)
+
+
 def _abrir_glosbe(direccion: str, texto: str):
     """Abre Glosbe con la palabra o la frase. direccion: 'eo/es' o 'es/eo'."""
     url = f"https://es.glosbe.com/{direccion}/{quote(texto, safe='')}"
@@ -739,6 +760,8 @@ class EditorWindow(QMainWindow):
             self.teoria.setHtml(html_con_tema(TEORIA.read_text(encoding="utf-8"), t))
         else:
             self.teoria.setPlainText("No encuentro theory/gramatica.html")
+        for act, flag in getattr(self, "_acciones_alineacion", []):
+            act.setIcon(icono_alineacion(flag, t["text"]))
 
     def cambiar_paleta(self, nombre: str):
         self.paleta = nombre
@@ -780,15 +803,29 @@ class EditorWindow(QMainWindow):
         act_open.triggered.connect(self.open_file)
         tb.addAction(act_open)
 
+        # Ctrl+S sin botón propio
         act_save = QAction("Guardar", self)
         act_save.setShortcut(QKeySequence.Save)
         act_save.triggered.connect(self.save_file)
-        tb.addAction(act_save)
+        self.addAction(act_save)
 
-        act_pdf = QAction("PDF", self)
-        act_pdf.setToolTip("Exportar a PDF")
-        act_pdf.triggered.connect(self.exportar_pdf)
-        tb.addAction(act_pdf)
+        # Guardar ▾: guardar o elegir formato
+        boton_guardar = QToolButton()
+        boton_guardar.setText("Guardar ▾")
+        boton_guardar.setToolTip("Guardar o elegir formato")
+        boton_guardar.setPopupMode(QToolButton.InstantPopup)
+        menu_guardar = QMenu(boton_guardar)
+        act_g = menu_guardar.addAction("Guardar (Ctrl+S)")
+        act_g.triggered.connect(lambda _=False: self.save_file())
+        menu_guardar.addSeparator()
+        act_html = menu_guardar.addAction("Guardar como HTML")
+        act_html.triggered.connect(lambda _=False: self.guardar_como("html"))
+        act_txt = menu_guardar.addAction("Guardar como texto plano")
+        act_txt.triggered.connect(lambda _=False: self.guardar_como("txt"))
+        act_pdf = menu_guardar.addAction("Guardar como PDF")
+        act_pdf.triggered.connect(lambda _=False: self.exportar_pdf())
+        boton_guardar.setMenu(menu_guardar)
+        tb.addWidget(boton_guardar)
 
         tb.addSeparator()
 
@@ -862,7 +899,7 @@ class EditorWindow(QMainWindow):
                                     ("Centro", Qt.AlignHCenter, "Centrar"),
                                     ("Der.", Qt.AlignRight, "Alinear a la derecha"),
                                     ("Justif.", Qt.AlignJustify, "Justificar")]:
-            act = QAction(etiqueta, self)
+            act = QAction(icono_alineacion(flag, tokens(self.paleta, self.modo)["text"]), "", self)
             act.setCheckable(True)
             act.setToolTip(tip)
             act.triggered.connect(lambda _=False, f=flag: self.editor.setAlignment(f))
@@ -1069,6 +1106,25 @@ class EditorWindow(QMainWindow):
         alineacion = self.editor.alignment() & Qt.AlignHorizontal_Mask
         for act, flag in self._acciones_alineacion:
             act.setChecked(alineacion == flag)
+
+    def guardar_como(self, formato: str):
+        """Guarda en HTML o texto plano eligiendo el nombre del archivo."""
+        filtros = {"html": ("Texto enriquecido (*.html)", ".html"),
+                   "txt": ("Texto plano (*.txt)", ".txt")}
+        filtro, ext = filtros[formato]
+        path, _ = QFileDialog.getSaveFileName(self, "Guardar como", "", filtro)
+        if not path:
+            return
+        if not path.lower().endswith(ext):
+            path += ext
+        p = Path(path)
+        if formato == "html":
+            p.write_text(self.editor.toHtml(), encoding="utf-8")
+        else:
+            p.write_text(self.editor.toPlainText(), encoding="utf-8")
+        self.current_path = p
+        self.editor.document().setModified(False)
+        self._update_title(False)
 
     def exportar_pdf(self):
         path, _ = QFileDialog.getSaveFileName(self, "Exportar a PDF", "", "PDF (*.pdf)")

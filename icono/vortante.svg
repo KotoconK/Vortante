@@ -2,14 +2,14 @@
   <!-- Fondo verde esperanto -->
   <rect x="16" y="16" width="480" height="480" rx="96" fill="#00843D"/>
   <!-- Aro de la brújula -->
-  <circle cx="256" cy="256" r="168" fill="none" stroke="#FFFFFF" stroke-width="22"/>
-  <!-- Aguja: mitad norte dorada, mitad sur blanca -->
+  <circle cx="256" cy="256" r="164" fill="none" stroke="#FFFFFF" stroke-width="24"/>
+  <!-- Aguja con forma de plumilla: norte dorado, sur blanco, ranura verde -->
   <g transform="rotate(45 256 256)">
-    <polygon points="256,118 284,256 228,256" fill="#FFD23F"/>
-    <polygon points="256,394 284,256 228,256" fill="#FFFFFF"/>
+    <polygon points="256,88 274,256 238,256" fill="#FFD23F"/>
+    <polygon points="256,424 274,256 238,256" fill="#FFFFFF"/>
+    <line x1="256" y1="150" x2="256" y2="236" stroke="#00843D" stroke-width="8" stroke-linecap="round"/>
   </g>
-  <!-- Pluma: plumín apuntando al centro de la brújula -->
-  <path d="M338 338 L404 404 L420 386 L404 352 Z" fill="#FFFFFF"/>
-  <path d="M338 338 L318 358 L330 370 L352 350 Z" fill="#FFD23F"/>
-  <circle cx="256" cy="256" r="12" fill="#FFFFFF"/>
+  <!-- Eje central -->
+  <circle cx="256" cy="256" r="16" fill="#FFFFFF"/>
+  <circle cx="256" cy="256" r="6" fill="#00843D"/>
 </svg>
